@@ -1,0 +1,76 @@
+name: Issue 1162 contract validation
+on:
+  push:
+    branches: ['validation/1162-errors-20261023']
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt,clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: issue1162-${{ runner.os }}-${{ hashFiles('contracts/Cargo.lock') }}
+      - name: Production check
+        id: check
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo check --locked 2>&1 | tee check.log
+      - name: Full test baseline
+        id: full
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo test --locked --all -- --test-threads=2 2>&1 | tee full-tests.log
+      - name: Integration suites
+        id: integration
+        continue-on-error: true
+        working-directory: contracts
+        shell: bash
+        run: |
+          set +e
+          result=0
+          for file in tests/*.rs; do
+            name=$(basename "$file" .rs)
+            cargo test --locked --test "$name" -- --test-threads=2 > "$name.log" 2>&1
+            code=$?
+            echo "$name exit=$code"
+            tail -n 5 "$name.log"
+            if [ "$code" != 0 ]; then result=1; fi
+          done
+          exit "$result"
+      - name: Production clippy
+        id: clippy
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo clippy --locked --lib -- -D warnings 2>&1 | tee clippy.log
+      - name: WASM release
+        id: wasm
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo build --locked --release --target wasm32-unknown-unknown 2>&1 | tee wasm.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-validation
+          path: contracts/*.log
+      - name: Require all checks
+        if: always()
+        env:
+          CHECK: ${{ steps.check.outcome }}
+          FULL: ${{ steps.full.outcome }}
+          INTEGRATION: ${{ steps.integration.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+          WASM: ${{ steps.wasm.outcome }}
+        run: |
+          printf 'check=%s full=%s integration=%s clippy=%s wasm=%s\n' "$CHECK" "$FULL" "$INTEGRATION" "$CLIPPY" "$WASM"
+          test "$CHECK/$FULL/$INTEGRATION/$CLIPPY/$WASM" = success/success/success/success/success
