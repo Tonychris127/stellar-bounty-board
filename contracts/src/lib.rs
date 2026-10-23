@@ -717,7 +717,10 @@ impl StellarBountyBoardContract {
 
         let token_client = TokenClient::new(&env, &token);
         let contract_address = env.current_contract_address();
-        if !matches!(token_client.try_transfer(&maintainer, &contract_address, &amount), Ok(Ok(()))) {
+        if !matches!(
+            token_client.try_transfer(&maintainer, &contract_address, &amount),
+            Ok(Ok(()))
+        ) {
             panic_error(&env, ContractError::EscrowTransferFailed);
         }
 
@@ -921,7 +924,9 @@ impl StellarBountyBoardContract {
         if bounty.status != BountyStatus::Reserved {
             panic_error(&env, ContractError::BountyMustBeReserved);
         }
-        let assigned = bounty.contributor.as_ref()
+        let assigned = bounty
+            .contributor
+            .as_ref()
             .unwrap_or_else(|| panic_error(&env, ContractError::MissingContributor));
         if assigned != &contributor {
             panic_error(&env, ContractError::ContributorMismatch);
@@ -980,7 +985,9 @@ impl StellarBountyBoardContract {
             panic_error(&env, ContractError::BountyMustBeSubmitted);
         }
 
-        let contributor = bounty.contributor.clone()
+        let contributor = bounty
+            .contributor
+            .clone()
             .unwrap_or_else(|| panic_error(&env, ContractError::MissingContributor));
 
         let token_client = TokenClient::new(&env, &bounty.token);
@@ -1001,7 +1008,10 @@ impl StellarBountyBoardContract {
         let net_payout = bounty.amount - fee_amount;
 
         // Transfer net payout to contributor
-        if !matches!(token_client.try_transfer(&contract_address, &contributor, &net_payout), Ok(Ok(()))) {
+        if !matches!(
+            token_client.try_transfer(&contract_address, &contributor, &net_payout),
+            Ok(Ok(()))
+        ) {
             panic_error(&env, ContractError::PayoutTransferFailed);
         }
 
@@ -1012,9 +1022,12 @@ impl StellarBountyBoardContract {
                 .persistent()
                 .get(&DataKey::FeeRecipient)
                 .unwrap_or_else(|| panic_error(&env, ContractError::FeeRecipientNotSet));
-            if !matches!(token_client.try_transfer(&contract_address, &fee_recipient, &fee_amount), Ok(Ok(()))) {
-            panic_error(&env, ContractError::FeeTransferFailed);
-        }
+            if !matches!(
+                token_client.try_transfer(&contract_address, &fee_recipient, &fee_amount),
+                Ok(Ok(()))
+            ) {
+                panic_error(&env, ContractError::FeeTransferFailed);
+            }
         }
         // ─────────────────────────────────────────────────────────────────
 
@@ -1103,7 +1116,10 @@ impl StellarBountyBoardContract {
         let token_client = TokenClient::new(&env, &bounty.token);
         let contract_address = env.current_contract_address();
         // Refund returns the FULL original amount there is no fee on refunds
-        if !matches!(token_client.try_transfer(&contract_address, &maintainer, &bounty.amount), Ok(Ok(()))) {
+        if !matches!(
+            token_client.try_transfer(&contract_address, &maintainer, &bounty.amount),
+            Ok(Ok(()))
+        ) {
             panic_error(&env, ContractError::RefundTransferFailed);
         }
 
