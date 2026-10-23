@@ -21,12 +21,15 @@ jobs:
             ~/.cargo/git
             contracts/target
           key: issue1162-${{ runner.os }}-${{ hashFiles('contracts/Cargo.lock') }}
+      - name: Format Rust sources
+        working-directory: contracts
+        run: cargo fmt --all
       - name: Production check
         id: check
         continue-on-error: true
         working-directory: contracts
         run: cargo check --locked 2>&1 | tee check.log
-      - name: Full test baseline
+      - name: Full test suite
         id: full
         continue-on-error: true
         working-directory: contracts
@@ -58,11 +61,19 @@ jobs:
         continue-on-error: true
         working-directory: contracts
         run: cargo build --locked --release --target wasm32-unknown-unknown 2>&1 | tee wasm.log
+      - name: Collect formatted sources
+        if: always()
+        run: |
+          mkdir -p formatted/contracts/src formatted/contracts/tests
+          cp contracts/src/*.rs formatted/contracts/src/
+          cp contracts/tests/*.rs formatted/contracts/tests/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: contract-validation
-          path: contracts/*.log
+          path: |
+            contracts/*.log
+            formatted/
       - name: Require all checks
         if: always()
         env:
