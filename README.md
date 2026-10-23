@@ -723,6 +723,11 @@ Verification: `cargo test --locked --test lifecycle_errors` checks exact SDK
 errors/enum conversion, all lifecycle guards, real Stellar asset transfer
 rejection/rollback and missing signatures. Existing lifecycle, role, fuzz and
 arbiter tests use the numeric wire envelope as well.
+With the pinned SDK 27 and modern Rust, build the contract with
+`rustup target add wasm32v1-none` and
+`cargo build --locked --release --target wasm32v1-none`. SDK 27 rejects the
+older `wasm32-unknown-unknown` target used by the current CI setup; that target
+failure also occurs on the unchanged baseline.
 
 ## FAQ
 

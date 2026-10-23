@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none
           components: rustfmt,clippy
       - uses: actions/cache@v4
         with:
@@ -63,7 +63,7 @@ jobs:
         id: wasm
         continue-on-error: true
         working-directory: contracts
-        run: cargo build --locked --release --target wasm32-unknown-unknown 2>&1 | tee wasm.log
+        run: cargo build --locked --release --target wasm32v1-none 2>&1 | tee wasm.log
       - name: Collect formatted sources
         if: always()
         run: |
