@@ -713,6 +713,12 @@ IDs and bounty state, including when a net payout succeeds before a fee fails.
 Host resource limits, invalid ABI arguments and malformed storage decoding remain
 host failures; they are not fabricated business-error variants.
 
+The existing frontend `ContractError` enum and `CONTRACT_ERROR_LABELS` are generated
+from this declaration by `node scripts/generate-contract-errors.mjs`. Use
+`node scripts/generate-contract-errors.mjs --check` to detect drift without writing
+files; the root script tests run the same check. The generator updates only the
+error sections of the existing bindings, preserving unrelated ABI types.
+
 Verification: `cargo test --locked --test lifecycle_errors` checks exact SDK
 errors/enum conversion, all lifecycle guards, real Stellar asset transfer
 rejection/rollback and missing signatures. Existing lifecycle, role, fuzz and
