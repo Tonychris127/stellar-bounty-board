@@ -50,7 +50,9 @@ impl Fixture {
         let arbiter = Address::generate(&env);
         let fee_recipient = Address::generate(&env);
         let asset = env.register_stellar_asset_contract_v2(Address::generate(&env));
-        asset.issuer().set_flag(soroban_sdk::testutils::IssuerFlags::RevocableFlag);
+        asset
+            .issuer()
+            .set_flag(soroban_sdk::testutils::IssuerFlags::RevocableFlag);
         let token = asset.address();
         token::StellarAssetClient::new(&env, &token).mint(&maintainer, &1_000_000);
         client.initialize(&admin, &fee_recipient, &arbiter, &600);

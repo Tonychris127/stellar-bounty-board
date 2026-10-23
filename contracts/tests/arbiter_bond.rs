@@ -57,9 +57,7 @@ fn setup() -> Fixture {
     client.initialize(&admin, &treasury, &arbiter, &DISPUTE_WINDOW);
 
     let token_admin = Address::generate(&env);
-    let token = env
-        .register_stellar_asset_contract_v2(token_admin)
-        .address();
+    let token = env.register_stellar_asset_contract_v2(token_admin).address();
 
     Fixture {
         env,
@@ -172,9 +170,7 @@ fn bonding_requires_the_bonders_signature() {
     client.initialize(&admin, &treasury, &arbiter, &DISPUTE_WINDOW);
 
     let borrower = Address::generate(&env);
-    let token = env
-        .register_stellar_asset_contract_v2(Address::generate(&env))
-        .address();
+    let token = env.register_stellar_asset_contract_v2(Address::generate(&env)).address();
     client.bond_arbiter_stake(&borrower, &token, &5_000);
 }
 
@@ -183,7 +179,10 @@ fn bonding_requires_the_bonders_signature() {
 #[test]
 fn the_minimum_stake_defaults_to_the_documented_constant() {
     let f = setup();
-    assert_eq!(f.client.get_min_arbiter_stake(), DEFAULT_MIN_ARBITER_STAKE);
+    assert_eq!(
+        f.client.get_min_arbiter_stake(),
+        DEFAULT_MIN_ARBITER_STAKE
+    );
 }
 
 #[test]
@@ -279,11 +278,8 @@ fn slashing_forfeits_to_the_treasury_and_leaves_the_remainder() {
     let f = setup();
     f.bond(&f.candidate, 5_000);
 
-    f.client.slash_arbiter(
-        &f.candidate,
-        &2_000,
-        &soroban_sdk::String::from_str(&f.env, "bad ruling"),
-    );
+    f.client
+        .slash_arbiter(&f.candidate, &2_000, &soroban_sdk::String::from_str(&f.env, "bad ruling"));
 
     assert_eq!(f.token().balance(&f.treasury), 2_000);
     assert_eq!(f.token().balance(&f.contract), 3_000);
@@ -314,11 +310,8 @@ fn slashing_more_than_the_bond_is_rejected() {
     // over-slash has to fail rather than drain other bounties' escrow.
     let f = setup();
     f.bond(&f.candidate, 5_000);
-    f.client.slash_arbiter(
-        &f.candidate,
-        &5_001,
-        &soroban_sdk::String::from_str(&f.env, "too much"),
-    );
+    f.client
+        .slash_arbiter(&f.candidate, &5_001, &soroban_sdk::String::from_str(&f.env, "too much"));
 }
 
 #[test]
@@ -337,11 +330,8 @@ fn slashing_an_unbonded_address_is_rejected() {
 fn slashing_zero_is_rejected() {
     let f = setup();
     f.bond(&f.candidate, 5_000);
-    f.client.slash_arbiter(
-        &f.candidate,
-        &0,
-        &soroban_sdk::String::from_str(&f.env, "noise"),
-    );
+    f.client
+        .slash_arbiter(&f.candidate, &0, &soroban_sdk::String::from_str(&f.env, "noise"));
 }
 
 #[test]
