@@ -6,7 +6,9 @@ use soroban_sdk::{
     xdr::ContractEventBody,
     Address, Env, FromVal, Map, String, Symbol, TryFromVal, Val,
 };
-use stellar_bounty_board::{BountyStatus, StellarBountyBoardContract, StellarBountyBoardContractClient};
+use stellar_bounty_board::{
+    BountyStatus, StellarBountyBoardContract, StellarBountyBoardContractClient,
+};
 
 // SAC fixtures always report seven decimals. This minimal test-only token
 // implements the transfer/balance/metadata surface with real configurable precision.
@@ -24,7 +26,9 @@ enum Key {
 impl PrecisionToken {
     pub fn __constructor(env: Env, decimals: u32, holder: Address, amount: i128) {
         env.storage().instance().set(&Key::Decimals, &decimals);
-        env.storage().persistent().set(&Key::Balance(holder), &amount);
+        env.storage()
+            .persistent()
+            .set(&Key::Balance(holder), &amount);
     }
 
     pub fn decimals(env: Env) -> u32 {
@@ -32,7 +36,10 @@ impl PrecisionToken {
     }
 
     pub fn balance(env: Env, owner: Address) -> i128 {
-        env.storage().persistent().get(&Key::Balance(owner)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&Key::Balance(owner))
+            .unwrap_or(0)
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
@@ -43,8 +50,12 @@ impl PrecisionToken {
         if from == to {
             return;
         }
-        let received = Self::balance(env.clone(), to.clone()).checked_add(amount).unwrap();
-        env.storage().persistent().set(&Key::Balance(from), &(available - amount));
+        let received = Self::balance(env.clone(), to.clone())
+            .checked_add(amount)
+            .unwrap();
+        env.storage()
+            .persistent()
+            .set(&Key::Balance(from), &(available - amount));
         env.storage().persistent().set(&Key::Balance(to), &received);
     }
 }
@@ -83,7 +94,14 @@ impl Fixture {
             client.add_allowed_token(&admin, token);
             assert_eq!(TokenClient::new(&env, token).decimals(), [7, 6][i]);
         }
-        Self { env, board, maintainer, contributor, fee_recipient, tokens }
+        Self {
+            env,
+            board,
+            maintainer,
+            contributor,
+            fee_recipient,
+            tokens,
+        }
     }
 
     fn client(&self) -> StellarBountyBoardContractClient<'_> {
@@ -92,16 +110,27 @@ impl Fixture {
 
     fn fund(&self, token: usize, amount: i128, fee: u32) -> u64 {
         self.client().create_bounty(
-            &self.maintainer, &self.tokens[token], &amount,
-            &String::from_str(&self.env, "org/repo"), &1910,
-            &String::from_str(&self.env, "asset units"), &2_000, &fee, &None,
+            &self.maintainer,
+            &self.tokens[token],
+            &amount,
+            &String::from_str(&self.env, "org/repo"),
+            &1910,
+            &String::from_str(&self.env, "asset units"),
+            &2_000,
+            &fee,
+            &None,
         )
     }
 
     fn balances(&self, token: usize) -> [i128; 4] {
         let client = TokenClient::new(&self.env, &self.tokens[token]);
-        [&self.maintainer, &self.board, &self.contributor, &self.fee_recipient]
-            .map(|owner| client.balance(owner))
+        [
+            &self.maintainer,
+            &self.board,
+            &self.contributor,
+            &self.fee_recipient,
+        ]
+        .map(|owner| client.balance(owner))
     }
 
     fn assert_change(&self, id: u64, token: usize, delta: i128, previous: i128, remaining: i128) {
@@ -116,11 +145,23 @@ impl Fixture {
                 changes.push(Map::<Symbol, Val>::from_val(&self.env, &body.data));
             }
         }
-        let last = changes.last().expect("committed escrow accounting event");
+        assert_eq!(changes.len(), 1, "one committed escrow change per invocation");
+        let last = &changes[0];
         let field = |name| last.get(Symbol::new(&self.env, name)).unwrap();
-        assert_eq!(u64::try_from_val(&self.env, &field("bounty_id")).unwrap(), id);
-        assert_eq!(Address::try_from_val(&self.env, &field("token")).unwrap(), self.tokens[token]);
-        for (name, value) in [("delta", delta), ("amount", delta.abs()), ("previous", previous), ("remaining", remaining)] {
+        assert_eq!(
+            u64::try_from_val(&self.env, &field("bounty_id")).unwrap(),
+            id
+        );
+        assert_eq!(
+            Address::try_from_val(&self.env, &field("token")).unwrap(),
+            self.tokens[token]
+        );
+        for (name, value) in [
+            ("delta", delta),
+            ("amount", delta.abs()),
+            ("previous", previous),
+            ("remaining", remaining),
+        ] {
             assert_eq!(i128::try_from_val(&self.env, &field(name)).unwrap(), value);
         }
     }
@@ -140,19 +181,32 @@ fn precision_metadata_does_not_rescale_funding_or_fee_payouts() {
         let stored = f.client().get_bounty(&ids[target]);
         assert_eq!(stored.token, f.tokens[target]);
         assert_eq!(stored.amount, amount);
-        assert_eq!(f.balances(target), [MINTED - amount - 101, amount + 101, 0, 0]);
+        assert_eq!(
+            f.balances(target),
+            [MINTED - amount - 101, amount + 101, 0, 0]
+        );
         f.client().reserve_bounty(&ids[target], &f.contributor);
         f.client().submit_bounty(&ids[target], &f.contributor);
-        assert_eq!(f.balances(target), [MINTED - amount - 101, amount + 101, 0, 0]);
+        assert_eq!(
+            f.balances(target),
+            [MINTED - amount - 101, amount + 101, 0, 0]
+        );
         f.client().release_bounty(&ids[target], &f.maintainer);
+        // SDK 27 exposes only the last invocation; inspect before balance getters.
+        f.assert_change(ids[target], target, -amount, amount, 0);
         // Both amounts leave a remainder: integer division floors the fee.
         let fee = amount * 333 / 10_000;
         assert_ne!(amount * 333 % 10_000, 0);
-        assert_eq!(f.balances(target), [MINTED - amount - 101, 101, amount - fee, fee]);
+        assert_eq!(
+            f.balances(target),
+            [MINTED - amount - 101, 101, amount - fee, fee]
+        );
         assert_eq!(f.balances(other), other_before);
         assert_eq!(f.client().get_bounty(&sibling).status, BountyStatus::Open);
-        assert_eq!(f.client().get_bounty(&ids[target]).status, BountyStatus::Released);
-        f.assert_change(ids[target], target, -amount, amount, 0);
+        assert_eq!(
+            f.client().get_bounty(&ids[target]).status,
+            BountyStatus::Released
+        );
     }
 }
 
@@ -164,11 +218,17 @@ fn expiry_refunds_exact_units_of_only_the_funded_asset() {
         let other_before = f.balances(1 - target);
         f.env.ledger().set_timestamp(2_001);
         f.client().refund_bounty(&ids[target], &f.maintainer);
+        f.assert_change(ids[target], target, -AMOUNTS[target], AMOUNTS[target], 0);
         assert_eq!(f.balances(target), [MINTED, 0, 0, 0]);
         assert_eq!(f.balances(1 - target), other_before);
-        assert_eq!(f.client().get_bounty(&ids[target]).status, BountyStatus::Refunded);
-        f.assert_change(ids[target], target, -AMOUNTS[target], AMOUNTS[target], 0);
-        assert!(f.client().try_refund_bounty(&ids[target], &f.maintainer).is_err());
+        assert_eq!(
+            f.client().get_bounty(&ids[target]).status,
+            BountyStatus::Refunded
+        );
+        assert!(f
+            .client()
+            .try_refund_bounty(&ids[target], &f.maintainer)
+            .is_err());
         assert_eq!(f.balances(target), [MINTED, 0, 0, 0]);
         assert_eq!(f.balances(1 - target), other_before);
     }
@@ -179,11 +239,20 @@ fn another_assets_balance_cannot_cover_insufficient_funding() {
     let f = Fixture::new();
     let existing = f.fund(0, AMOUNTS[0], 0);
     let before = [f.balances(0), f.balances(1)];
-    assert!(f.client().try_create_bounty(
-        &f.maintainer, &f.tokens[1], &(MINTED + 1),
-        &String::from_str(&f.env, "org/repo"), &1910,
-        &String::from_str(&f.env, "insufficient asset"), &2_000, &0, &None,
-    ).is_err());
+    assert!(f
+        .client()
+        .try_create_bounty(
+            &f.maintainer,
+            &f.tokens[1],
+            &(MINTED + 1),
+            &String::from_str(&f.env, "org/repo"),
+            &1910,
+            &String::from_str(&f.env, "insufficient asset"),
+            &2_000,
+            &0,
+            &None,
+        )
+        .is_err());
     assert_eq!([f.balances(0), f.balances(1)], before);
     assert_eq!(f.client().get_bounty(&existing).amount, AMOUNTS[0]);
     // Rejection must not consume an ID or create an escrow obligation.
