@@ -1,0 +1,67 @@
+name: Issue 1910 validation
+on:
+  push:
+    branches: [validation/1910-asset-units-20261125]
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+      - name: Format focused test
+        run: rustfmt --edition 2021 contracts/tests/escrow_asset_units.rs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: formatted-test
+          path: contracts/tests/escrow_asset_units.rs
+      - name: Focused asset-unit tests
+        working-directory: contracts
+        run: cargo test --locked --test escrow_asset_units
+      - name: Full contract tests
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo test --locked --all
+      - name: Clippy
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Wasm build
+        continue-on-error: true
+        working-directory: contracts
+        run: cargo build --locked --release --target wasm32-unknown-unknown
+  repository:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci --ignore-scripts
+      - name: Repository script tests
+        continue-on-error: true
+        run: node --test scripts/*.test.mjs
+      - name: Configuration validation
+        continue-on-error: true
+        run: npm run validate:configs
+      - name: Formatting validation
+        continue-on-error: true
+        run: npm run format:check
