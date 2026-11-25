@@ -6,6 +6,10 @@ permissions:
   contents: read
 jobs:
   contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [fix, baseline]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -17,20 +21,19 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ matrix.revision == 'baseline' && 'a7a38eb546b9e6c4d6a7bbd65eb65cf6032079a9' || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: contracts
-      - name: Format focused test
-        run: rustfmt --edition 2021 contracts/tests/escrow_asset_units.rs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: formatted-test
-          path: contracts/tests/escrow_asset_units.rs
+      - name: Check focused formatting
+        if: matrix.revision == 'fix'
+        run: rustfmt --check --edition 2021 contracts/tests/escrow_asset_units.rs
       - name: Focused asset-unit tests
+        if: matrix.revision == 'fix'
         working-directory: contracts
         run: cargo test --locked --test escrow_asset_units
       - name: Full contract tests
@@ -44,18 +47,24 @@ jobs:
       - name: Wasm build
         continue-on-error: true
         working-directory: contracts
-        run: cargo build --locked --release --target wasm32-unknown-unknown
+        run: cargo build --locked --release --target wasm32v1-none
   repository:
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [fix, baseline]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ matrix.revision == 'baseline' && 'a7a38eb546b9e6c4d6a7bbd65eb65cf6032079a9' || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts --prefix backend
       - name: Repository script tests
         continue-on-error: true
         run: node --test scripts/*.test.mjs

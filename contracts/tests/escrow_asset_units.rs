@@ -145,7 +145,11 @@ impl Fixture {
                 changes.push(Map::<Symbol, Val>::from_val(&self.env, &body.data));
             }
         }
-        assert_eq!(changes.len(), 1, "one committed escrow change per invocation");
+        assert_eq!(
+            changes.len(),
+            1,
+            "one committed escrow change per invocation"
+        );
         let last = &changes[0];
         let field = |name| last.get(Symbol::new(&self.env, name)).unwrap();
         assert_eq!(
